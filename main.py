@@ -2,6 +2,7 @@
 # Chase Mackey 2023
 
 from psychopy import visual, core, event, data, gui
+import os
 import json
 
 # Create a dialog box to get the participant's name
@@ -74,6 +75,9 @@ exp_data = data.ExperimentHandler(
     extraInfo={"participant": participant_name}
 )
 
+# Create a mouse object
+mouse = event.Mouse(win=win)
+
 # Main experiment loop
 for trial in green_trials:
     trial_count += 1
@@ -84,13 +88,16 @@ for trial in green_trials:
     # Draw the current box on the screen
     current_box.draw()
     win.flip()
-
-    # Wait for a mouse click
-    while not any(event.waitKeys(keyList=["mouse"])):
+    
+    # Wait for any mouse click
+    mouse.clickReset()
+    while not any(mouse.getPressed()):  # Wait for any mouse button click
         pass
 
     # Get mouse position
-    mouseX, mouseY = event.mouse.getPos()
+    mouseX, mouseY = mouse.getPos()
+    print(mouseX)
+    print(mouseY)
 
     # Check if mouse click was within the box
     if current_box.contains(mouseX, mouseY):
@@ -99,13 +106,16 @@ for trial in green_trials:
     else:
         correct_touch = 0
     
-    # Save trial data
+    # Construct trial data for adding
     trial_data = {
         "box_color": "green",
         "correct_touch": correct_touch,
         "correct_touch_count": correct_touch_count
     }
-    exp_data.addData(trial_data)
+
+    # Add each key-value pair from trial_data separately
+    for key, value in trial_data.items():
+        exp_data.addData(key, value)
 
     # Append performance data
     performance_data.append(correct_touch_count / trial_count)
@@ -119,7 +129,7 @@ for trial in green_trials:
     # Clear the screen
     win.flip()
 
-    # If 7 or more correct touches, switch to the other box
+   # If 7 or more correct touches, switch to the other box
     if correct_touch_count >= 7:
         if current_box == greenBox:
             current_box = redBox
@@ -130,11 +140,17 @@ for trial in green_trials:
     if 'escape' in event.getKeys():
         break
 
-# Save data to files
-exp_data.saveAsWideText(f"experiment_data_{participant_name}.csv")
-exp_data.save()
+# Specify the folder name for saving data
+data_folder = "data"  # Update this to your desired folder name
+
+# Create the data folder if it doesn't exist
+data_folder_path = os.path.join(os.path.dirname(__file__), data_folder)
+if not os.path.exists(data_folder_path):
+    os.makedirs(data_folder_path)
+
+# Save data to files in the specified folder
+exp_data.saveAsWideText(os.path.join(data_folder_path, f"experiment_data_{participant_name}.csv"))
 
 # Clean up
 win.close()
 core.quit()
-
