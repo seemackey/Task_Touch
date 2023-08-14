@@ -23,8 +23,7 @@ with open("monitor_specifications.json", "r") as json_file:
 screen_resolution = monitor_specs["screen_resolution"]
 monitor_width = monitor_specs["monitor_width"]
 full_screen = monitor_specs["full_screen"]
-print(monitor_width)
-print(screen_resolution)
+
 
 # Create a PsychoPy window
 win = visual.Window(
@@ -59,7 +58,7 @@ redBox = visual.Rect(
 # Create a list of trials for each box
 green_trials = data.TrialHandler(
     trialList=[{}],
-    nReps=10,  # Number of repetitions for each color
+    nReps=30,  # Number of repetitions for each color
     method='sequential'
 )
 
@@ -133,6 +132,8 @@ for trial in green_trials:
     if correct_touch_count >= 7:
         if current_box == greenBox:
             current_box = redBox
+        else:
+            current_box = greenBox
         correct_touch_count = 0
         trial_count = 0
 
