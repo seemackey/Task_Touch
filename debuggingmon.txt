@@ -4,7 +4,7 @@
     470
   ],
   "monitor_width": 800,
-  "full_screen": true,
+  "full_screen": false,
   "ttl_code": 255,
   "sound_fs": 44100,
   "mmb_port_code": null,

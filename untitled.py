@@ -47,14 +47,13 @@ win = visual.Window(
     size=screen_resolution,
     units="pix",
     fullscr=full_screen,
-    monitor="debugging_monitor",
-    screen=1,
+    monitor="debugging_monitor",  # Replace with your monitor calibration name
     waitBlanking=True
 )
 
 # Define the box size and movement amount based on monitor width
-box_size = monitor_width * 0.4  # % of monitor width
-movement_amount = box_size * 0.05  # 5% movement
+box_size = monitor_width * 0.4  # 10% of monitor width
+movement_amount = box_size * 0.025  # 5% movement
 
 # Create the green and red squares
 greenBox = visual.Rect(
@@ -74,7 +73,7 @@ redBox = visual.Rect(
 )
 
 # Create a list of colors and the number of repetitions for each color
-colors_with_reps = [("green", 1000), ("red", 1000)]
+colors_with_reps = [("green", 100), ("red", 100)]
 
 # Create a list of trials for each color based on repetitions
 color_trials = []
@@ -95,34 +94,17 @@ trial_count = 0
 # Create a mouse object
 mouse = event.Mouse(win=win)
 
-# function that saves data
-def save_data(trial_data_list, data_file_path):
-    """Save the trial data to a CSV file."""
-    with open(data_file_path, "w", newline='') as f:
-        fieldnames = trial_data_list[0].keys()
-        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore', lineterminator='\n')
-        writer.writeheader()
-        writer.writerows(trial_data_list)
-
 # Main experiment loop
 trial_data_list = []  # List to store trial data dictionaries
-direction_change_interval = 10  # Change direction every 10 trials
-change_direction_counter = 0
-
-
 for trial in trials:
     trial_count += 1
 
-
-
-    if change_direction_counter >= direction_change_interval:
-        movement_amount *= -1  # Change direction
-        change_direction_counter = 0  # Reset the counter
-
-    change_direction_counter += 1
-
     # Move the box slightly on each trial
-    current_box.pos -= (movement_amount, movement_amount)
+    if trial_count < 30:
+        current_box.pos += (movement_amount, movement_amount)
+    else:
+        current_box.pos -= (movement_amount, movement_amount)
+        
     
     # Draw the current box on the screen
     current_box.draw()
@@ -132,11 +114,7 @@ for trial in trials:
     # Wait for any mouse click
     mouse.clickReset()
     while not any(mouse.getPressed()):  # Wait for any mouse button click
-        if 'escape' in event.getKeys():
-            save_data(trial_data_list, data_file_path)
-            win.close()
-            core.quit()
-        core.wait(0.01)
+        pass
 
     # Get mouse position
     mouseX, mouseY = mouse.getPos()
@@ -148,7 +126,7 @@ for trial in trials:
         correct_touch_count += 1
         tNow = core.getTime()
         responseTime = tNow  # Update RT
-        #port.write(str.encode('r4'))  # pulse rew system X times
+        #port.write(str.encode('r1'))  # pulse rew system
     else:
         correct_touch = 0
 
@@ -188,9 +166,17 @@ for trial in trials:
         correct_touch_count = 0
         trial_count = 0
 
-# natural end, no esc key
-save_data(trial_data_list, data_file_path)
+    # Check for escape key press to exit the experiment
+    if 'escape' in event.getKeys():
+        break
 
+# Save data to CSV file
+data_file_path = os.path.join(data_folder, data_file)
+with open(data_file_path, "w") as f:
+    fieldnames = trial_data_list[0].keys()
+    writer = csv.DictWriter(f, fieldnames=fieldnames,extrasaction='ignore', lineterminator='\n')
+    writer.writeheader()
+    writer.writerows(trial_data_list)
 # Clean up
 win.close()
 core.quit()
