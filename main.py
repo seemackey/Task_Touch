@@ -6,9 +6,16 @@ import os
 import json
 import csv
 import serial
-#port = serial.Serial("COM3",115200) # serial port and baud rate for dell xps laptop
+port = serial.Serial("COM3",115200) # serial port and baud rate for dell xps laptop
 
+# EXPERIMENT PARAMETERS ADJUST HERE, ADJ REW SIZE AROUND LINE 151
+direction_change_interval = 5  # Change direction every 5 trials
+required_touch_duration = 0.5  # seconds
+# Define the box size and movement amount based on monitor width
+box_size = monitor_width * 0.4  # % of monitor width
+movement_amount = box_size * 0.05  # 5% movement
 
+# name of data folder
 data_folder = "data"
 
 # Create a dialog box to get the participant's name
@@ -52,9 +59,7 @@ win = visual.Window(
     waitBlanking=True
 )
 
-# Define the box size and movement amount based on monitor width
-box_size = monitor_width * 0.4  # % of monitor width
-movement_amount = box_size * 0.05  # 5% movement
+
 
 # Create the green and red squares
 greenBox = visual.Rect(
@@ -106,14 +111,10 @@ def save_data(trial_data_list, data_file_path):
 
 # Main experiment loop
 trial_data_list = []  # List to store trial data dictionaries
-direction_change_interval = 10  # Change direction every 10 trials
 change_direction_counter = 0
-
 
 for trial in trials:
     trial_count += 1
-
-
 
     if change_direction_counter >= direction_change_interval:
         movement_amount *= -1  # Change direction
@@ -129,34 +130,42 @@ for trial in trials:
     win.flip()
     StimTime = core.getTime()
 
-    # Wait for any mouse click
-    mouse.clickReset()
-    while not any(mouse.getPressed()):  # Wait for any mouse button click
+    # Initialize touch detection variables
+    touch_start_time = None
+    correct_touch = 0  # Assume touch is incorrect until proven otherwise
+    mouseX, mouseY = None, None  # Initialize mouse position variables
+
+    while True:
+        # Check for initial touch
+        if any(mouse.getPressed()):
+            if touch_start_time is None:  # If it's the start of a new touch
+                touch_start_time = core.getTime()
+                mouseX, mouseY = mouse.getPos()  # Capture mouse position at touch start
+        else:
+            if touch_start_time is not None:
+                # Check if the touch has been held for the required duration
+                if (core.getTime() - touch_start_time) >= required_touch_duration:
+                    # A touch of sufficient duration has occurred, now check if it's correct or incorrect
+                    if current_box.contains(mouseX, mouseY):
+                        correct_touch = 1  # Mark the touch as correct
+                        port.write(str.encode('r4')) # pulse the reward system X num times
+                    responseTime = core.getTime()  # Capture the response time
+                    break  # Exit the loop once a touch is processed
+                touch_start_time = None  # Reset for the next touch
+
+        # Periodically check for escape key to allow exiting the experiment
         if 'escape' in event.getKeys():
-            save_data(trial_data_list, data_file_path)
+            save_data(trial_data_list, data_file_path)  # Save data before exiting
             win.close()
             core.quit()
-        core.wait(0.01)
 
-    # Get mouse position
-    mouseX, mouseY = mouse.getPos()
+        core.wait(0.01)  # Prevent the loop from consuming too much CPU
 
-    # Check if mouse click was within the box
-    responseTime = core.getTime()
-    if current_box.contains(mouseX, mouseY):
-        correct_touch = 1
-        correct_touch_count += 1
-        tNow = core.getTime()
-        responseTime = tNow  # Update RT
-        #port.write(str.encode('r4'))  # pulse rew system X times
-    else:
-        correct_touch = 0
+    # Record the touch as correct or incorrect
+    correct_touch_count += correct_touch  # Increment only if correct
 
     # Determine the color name based on the current box's fill color
-    if current_box == greenBox:
-        color_name = "green"
-    else:
-        color_name = "red"
+    color_name = "green" if current_box == greenBox else "red"
 
     # Construct trial data dictionary
     trial_data = {
@@ -165,28 +174,28 @@ for trial in trials:
         "correct_touch": correct_touch,
         "correct_touch_count": correct_touch_count,
         "StimTime": StimTime,
-        "RT": responseTime
+        "RT": responseTime - touch_start_time  # Correctly calculate response time
     }
 
     trial_data_list.append(trial_data)  # Append trial data to the list
 
     # Provide feedback
-    feedback_text = visual.TextStim(win, text=f"Correct touches: {correct_touch_count}/10", pos=(0, -300))
+    feedback_text = visual.TextStim(win, text=f"Correct touches: {correct_touch_count}", pos=(0, -300))
     feedback_text.draw()
     win.flip()
-    core.wait(1.5)  # Display feedback for 1.5 seconds
+    core.wait(3)  # Display feedback for 1.5 seconds
 
     # Clear the screen
     win.flip()
 
     # If 7 or more correct touches, switch to the other box
     if correct_touch_count >= 7:
-        if current_box == greenBox:
-            current_box = redBox
-        else:
-            current_box = greenBox
+        current_box = redBox if current_box == greenBox else greenBox
         correct_touch_count = 0
         trial_count = 0
+
+
+
 
 # natural end, no esc key
 save_data(trial_data_list, data_file_path)
