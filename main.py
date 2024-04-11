@@ -10,10 +10,8 @@ port = serial.Serial("COM3",115200) # serial port and baud rate for dell xps lap
 
 # EXPERIMENT PARAMETERS ADJUST HERE, ADJ REW SIZE AROUND LINE 151
 direction_change_interval = 5  # Change direction every 5 trials
-required_touch_duration = 0.5  # seconds
-# Define the box size and movement amount based on monitor width
-box_size = monitor_width * 0.4  # % of monitor width
-movement_amount = box_size * 0.05  # 5% movement
+required_touch_duration = 0.4  # seconds
+
 
 # name of data folder
 data_folder = "data"
@@ -44,10 +42,14 @@ participant_name = dlg.data[0]
 with open("monitor_specifications.json", "r") as json_file:
     monitor_specs = json.load(json_file)
 
-# Extract monitor parameters
+# Extract monitor parameters and MOVEMENT
 screen_resolution = monitor_specs["screen_resolution"]
 monitor_width = monitor_specs["monitor_width"]
 full_screen = monitor_specs["full_screen"]
+# Define the box size and movement amount based on monitor width
+box_size = monitor_width * 0.4  # % of monitor width
+movement_amount = box_size * 0.05  # 5% movement
+
 
 # Create a PsychoPy window
 win = visual.Window(
@@ -110,6 +112,12 @@ def save_data(trial_data_list, data_file_path):
         writer.writerows(trial_data_list)
 
 # Main experiment loop
+# Assuming the setup and initial parts of your script remain unchanged
+
+# Main experiment loop adaptation for hover detection
+# Assuming the setup and initial parts of your script remain unchanged
+
+# Main experiment loop
 trial_data_list = []  # List to store trial data dictionaries
 change_direction_counter = 0
 
@@ -122,6 +130,13 @@ for trial in trials:
 
     change_direction_counter += 1
 
+    # Calculate off-screen position
+    # For simplicity, using a position to the right and above the screen based on the screen resolution
+    off_screen_pos = (screen_resolution[0] * 1.5, screen_resolution[1] * 1.5)
+    
+    # Move the mouse cursor off-screen
+    mouse.setPos(newPos=off_screen_pos)
+
     # Move the box slightly on each trial
     current_box.pos -= (movement_amount, movement_amount)
     
@@ -130,51 +145,37 @@ for trial in trials:
     win.flip()
     StimTime = core.getTime()
 
-    # Initialize touch detection variables
-    touch_start_time = None
     correct_touch = 0  # Assume touch is incorrect until proven otherwise
-    mouseX, mouseY = None, None  # Initialize mouse position variables
 
-    while True:
-        # Check for initial touch
-        if any(mouse.getPressed()):
-            if touch_start_time is None:  # If it's the start of a new touch
-                touch_start_time = core.getTime()
-                mouseX, mouseY = mouse.getPos()  # Capture mouse position at touch start
-        else:
-            if touch_start_time is not None:
-                # Check if the touch has been held for the required duration
-                if (core.getTime() - touch_start_time) >= required_touch_duration:
-                    # A touch of sufficient duration has occurred, now check if it's correct or incorrect
-                    if current_box.contains(mouseX, mouseY):
-                        correct_touch = 1  # Mark the touch as correct
-                        port.write(str.encode('r4')) # pulse the reward system X num times
-                    responseTime = core.getTime()  # Capture the response time
-                    break  # Exit the loop once a touch is processed
-                touch_start_time = None  # Reset for the next touch
-
-        # Periodically check for escape key to allow exiting the experiment
-        if 'escape' in event.getKeys():
+    # Wait for a hover to detect touch
+    touch_detected = False
+    while not touch_detected:
+        # Implement your hover detection or touch detection logic here
+        # Note: With the mouse moved off-screen, you need to wait for the participant to move it back
+        if current_box.contains(mouse.getPos()):
+            correct_touch = 1  # Hover detected within the correct box
+            touch_detected = True
+            responseTime = core.getTime()
+            # Optionally, send signal to reward system
+            port.write(str.encode('r4'))  # Adjust command as needed
+        elif 'escape' in event.getKeys():
             save_data(trial_data_list, data_file_path)  # Save data before exiting
             win.close()
             core.quit()
 
-        core.wait(0.01)  # Prevent the loop from consuming too much CPU
+        core.wait(0.01)  # Small delay to prevent the loop from running too fast
 
     # Record the touch as correct or incorrect
     correct_touch_count += correct_touch  # Increment only if correct
 
-    # Determine the color name based on the current box's fill color
-    color_name = "green" if current_box == greenBox else "red"
-
     # Construct trial data dictionary
     trial_data = {
         "participant": participant_name,
-        "color": color_name,
+        "color": "green" if current_box == greenBox else "red",
         "correct_touch": correct_touch,
         "correct_touch_count": correct_touch_count,
         "StimTime": StimTime,
-        "RT": responseTime - touch_start_time  # Correctly calculate response time
+        "RT": responseTime - StimTime
     }
 
     trial_data_list.append(trial_data)  # Append trial data to the list
@@ -183,9 +184,9 @@ for trial in trials:
     feedback_text = visual.TextStim(win, text=f"Correct touches: {correct_touch_count}", pos=(0, -300))
     feedback_text.draw()
     win.flip()
-    core.wait(3)  # Display feedback for 1.5 seconds
+    core.wait(1.5)  # Display feedback for 1.5 seconds
 
-    # Clear the screen
+    # Clear the screen for the next trial
     win.flip()
 
     # If 7 or more correct touches, switch to the other box
@@ -194,12 +195,10 @@ for trial in trials:
         correct_touch_count = 0
         trial_count = 0
 
-
-
-
-# natural end, no esc key
+# At the end of all trials
 save_data(trial_data_list, data_file_path)
 
-# Clean up
+# Cleanup
 win.close()
 core.quit()
+
